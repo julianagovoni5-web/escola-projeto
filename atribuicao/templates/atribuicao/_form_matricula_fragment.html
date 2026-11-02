@@ -1,4 +1,4 @@
-<{% if request.GET.parcial == '1' %}
+{% if request.GET.parcial == '1' %}
     <!-- Injeção Assíncrona no Modal-Crud -->
     <h3 style="margin-top: 0; color: #002060;">{% if editando %}Editar Matrícula Curricular{% else %}+ Vincular Aluno à Turma{% endif %}</h3>
     <hr style="border: 0; border-top: 1px solid #cbd5e1; margin-bottom: 16px;">
@@ -21,8 +21,6 @@
     </script>
 {% else %}
     <!-- Renderização em Página Cheia de Segurança -->
-    {% extends 'base.html' %}
-    {% block content %}
     <p><a href="{% url 'gerenciar-turma' pk=turma.pk %}" class="botao-link">&larr; Voltar para a Turma</a></p>
     <h2>{% if editando %}Editar Aluno{% else %}Adicionar Aluno à Turma {{ turma.nome }}{% endif %}</h2>
     <div style="max-width: 500px; background: white; padding: 24px; border: 1px solid #cbd5e1; border-radius: 8px; margin-top: 16px;">
@@ -32,5 +30,4 @@
             <button type="submit" class="btn-crud" style="margin-top: 12px;">Salvar Alterações</button>
         </form>
     </div>
-    {% endblock %}
 {% endif %}
