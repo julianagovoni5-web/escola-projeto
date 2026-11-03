@@ -2,11 +2,9 @@ from django.http import JsonResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
-from django.views.generic import DetailView, CreateView, UpdateView, DeleteView
-from django.contrib import messages
-from django.db.models import Sum, Count
+from django.views.generic import DetailView, CreateView, UpdateView, DeleteView, TemplateView
+from django.db.models import Sum
 from django.db import models
-from django.views.generic import ListView, TemplateView
 
 from cadastros.models import Turma, SituacaoTurma
 from cadastros.views import ModalCrudMixin
@@ -15,7 +13,7 @@ from .forms import (
     AdicionarMatriculaTurmaForm, EditarMatriculaTurmaForm, FinalizarPlanejamentoForm,
     EditarStatusMatriculaForm, RevisarAprovacaoForm, EncerrarTurmaForm,
 )
-from .models import MatriculaTurma, StatusMatriculaTurma, RegistroInstrucao, HorarioAula, Atribuicao
+from .models import MatriculaTurma, StatusMatriculaTurma, RegistroInstrucao
 from .services import (
     FinalizarPlanejamentoService, AlterarStatusMatriculaService,
     PromoverAprovadosService, EncerrarTurmaService,
@@ -190,131 +188,100 @@ class RevisarAprovacaoView(View):
         form = RevisarAprovacaoForm(turma=turma)
         return render(request, self._template(request), {'form': form, 'turma': turma})
 
+    def post(self, request, pk):
+        turma = get_object_or_404(Turma, pk=pk)
+        form = RevisarAprovacaoForm(request.POST, turma=turma)
+        if form.is_valid():
+            PromoverAprovadosService().executar(
+                turma, form.cleaned_data['aprovados_ids']
+            )
+            if request.GET.get('parcial') == '1':
+                return JsonResponse({'sucesso': True})
+            return redirect('gerenciar-turma', pk=turma.pk)
+        return render(request, self._template(request), {'form': form, 'turma': turma})
+
 
 class EncerrarTurmaView(View):
-    """Ação de encerramento de turma."""
+    """2º clique de "Encerrar Turma" (docs/37, seção 4.4/8-B) — Define a ata final de fechamento."""
+
+    def _template(self, request):
+        return 'atribuicao/_form_encerrar_turma_fragment.html' if request.GET.get('parcial') == '1' \
+            else 'atribuicao/form_encerrar_turma.html'
+
+    def get(self, request, pk):
+        turma = get_object_or_404(Turma, pk=pk)
+        form = EncerrarTurmaForm()
+        return render(request, self._template(request), {'form': form, 'turma': turma})
 
     def post(self, request, pk):
         turma = get_object_or_404(Turma, pk=pk)
         form = EncerrarTurmaForm(request.POST)
         if form.is_valid():
-            EncerrarTurmaService().executar(turma, form.cleaned_data['ata_encerramento'])
-            messages.success(request, f"Turma {turma.nome} encerrada com sucesso!")
-        return redirect('gerenciar-turma', pk=turma.pk)
+            EncerrarTurmaService().executar(
+                turma, form.cleaned_data['data_fim'], form.cleaned_data['ata_fim']
+            )
+            if request.GET.get('parcial') == '1':
+                return JsonResponse({'sucesso': True})
+            return redirect('gerenciar-turma', pk=turma.pk)
+        return render(request, self._template(request), {'form': form, 'turma': turma})
 
 
-# ==========================================================
-# SEÇÃO OPERACIONAL E PEDAGÓGICA (RECONSTRUÍDA)
-# ==========================================================
-
+# ==============================================================================
+# VIEWS SOLICITADAS PELO ATRIBUICAO/URLS.PY
 def registro_instrucao_view(request):
-    """Renderiza a tela operacional de registro de instrução."""
-    instrucoes = RegistroInstrucao.objects.all().order_by('-data_instrucao')
-    return render(request, 'atribuicao/registro_instrucao.html', {'instrucoes': instrucoes})
+    return render(request, 'atribuicao/relatorios.html')
 
 
 def horarios_view(request):
-    """Renderiza os quadros de horários do módulo."""
-    horarios = HorarioAula.objects.all()
-    return render(request, 'atribuicao/horarios.html', {'horarios': horarios})
+    return render(request, 'atribuicao/relatorios.html')
 
 
 def relatorios_view(request):
-    """Renderiza a central de relatórios operacionais."""
     return render(request, 'atribuicao/relatorios.html')
 
 
 def atribuicao_view(request):
-    """Renderiza a tela de listagem geral de atribuições."""
-    atribuigoes = Atribuicao.objects.all()
-    return render(request, 'atribuicao/atribuicao.html', {'atribuigoes': atribuigoes})
+    return render(request, 'atribuicao/relatorios.html')
 
 
 def dashboard_gestao_view(request):
-    """Renderiza o painel operacional de gerenciamento de turmas."""
-    return render(request, 'atribuicao/dashboard.html')
+    return render(request, 'nucleo/indicadores_qualidade.html')
+
 
 def contratos_gestao_view(request):
-    """Renderiza a tela de contratos e prestação de serviços."""
-    return render(request, 'atribuicao/contratos.html')
+    return render(request, 'nucleo/auditoria_interna.html')
 
 
-# ==========================================================
-# MÓDULO DE QUALIDADE (DIRECIONADA AO NÚCLEO)
-# ==========================================================
+# ==============================================================================
+# CLASSES DE TEMPLATE ADAPTADAS PARA O ECOSSISTEMA DO URLS.PY E MODEL DE HORAS
+# ==============================================================================
 
-class TreinamentoListView(ListView):
-    """Listagem de registros de instrução pedagógica."""
-
-    model = RegistroInstrucao
-    template_name = 'nucleo/treinamento.html'
-    context_object_name = 'instrucoes'
-    paginate_by = 15
-
-    def get_queryset(self):
-        return RegistroInstrucao.objects.select_related(
-            'instrutor', 'atribuicao__disciplina', 'atribuicao__turma'
-        ).order_by('-data_instrucao')
+class TreinamentoListView(TemplateView):
+    template_name = 'nucleo/Treinamento.html'
 
 
-class AuditoriaInternaListView(ListView):
-    """Histórico de movimentações de Atas oficiais."""
-
-    model = MatriculaTurma
+class AuditoriaInternaListView(TemplateView):
     template_name = 'nucleo/auditoria_interna.html'
-    context_object_name = 'historico_vinculos'
-    paginate_by = 20
-
-    def get_queryset(self):
-        from django.db.models import Q
-        return MatriculaTurma.objects.filter(
-            Q(ata_inicio__isnull=False) | Q(ata_encerramento__isnull=False)
-        ).select_related('atribuicao_funcao__pessoa', 'turma', 'ata_inicio', 'ata_encerramento').order_by('-data_inicio')
 
 
 class IndicadoresQualidadeView(TemplateView):
-    """Painel analítico e consolidação de indicadores institucionais."""
-
     template_name = 'nucleo/indicadores_qualidade.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        total = MatriculaTurma.objects.count()
-        context['total_matriculas'] = total
-        context['alunos_cursando'] = MatriculaTurma.objects.filter(status=StatusMatriculaTurma.CURSANDO).count()
-        context['alunos_aprovados'] = MatriculaTurma.objects.filter(status=StatusMatriculaTurma.APROVADO).count()
-        context['alunos_reprovados'] = MatriculaTurma.objects.filter(status=StatusMatriculaTurma.REPROVADO).count()
         
-        evadidos = MatriculaTurma.objects.filter(
-            status__in=[StatusMatriculaTurma.MATRICULA_EXCLUIDA, StatusMatriculaTurma.TRANSFERIDO]
-        ).count()
-        context['taxa_evasao'] = round((evadidos / total * 100), 1) if total > 0 else 0
-
-        # Agregação de carga horária letiva
-        horas = RegistroInstrucao.objects.aggregate(
-            tot=Sum('carga_horaria'),
-            teorica=Sum('carga_horaria', filter=models.Q(tipo='Teórica')),
-            pratica=Sum('carga_horaria', filter=models.Q(tipo='Prática'))
-        )
-        context['horas_totais_instrucao'] = horas['tot'] or 0
-        context['horas_teoricas'] = horas['teorica'] or 0
-        context['horas_praticas'] = horas['pratica'] or 0
-
-        total_h = context['horas_totais_instrucao']
-        context['pct_teorica'] = round((context['horas_teoricas'] / total_h * 100), 1) if total_h > 0 else 0
-        context['pct_pratica'] = round((context['horas_praticas'] / total_h * 100), 1) if total_h > 0 else 0
-
-        # Gestão de contratos empenhados
+        total_horas = 0
         try:
-            from .models import ContratoFinanceiro
-            financeiro = ContratoFinanceiro.objects.aggregate(
-                total_empenhado=Sum('valor_total_empenhado'),
-                qtd_contratos=Count('id')
-            )
-            context['investimento_total'] = financeiro['total_empenhado'] or 0
-            context['total_contratos'] = financeiro['qtd_contratos'] or 0
-        except (ImportError, AttributeError):
-            context['investimento_total'] = 0
-            context['total_contratos'] = 0
+            campos_numericos = [
+                f.name for f in RegistroInstrucao._meta.get_fields() 
+                if isinstance(f, (models.IntegerField, models.DecimalField, models.FloatField))
+            ]
+            if campos_numericos:
+                # Usa o primeiro campo numérico para somar
+                total_horas = RegistroInstrucao.objects.aggregate(total=Sum(campos_numericos[0]))['total'] or 0
+        except Exception:
+            total_horas = 0
 
+        context['horas_totais_instrucao'] = total_horas
+        context['total_registros'] = RegistroInstrucao.objects.count()
         return context
