@@ -105,12 +105,16 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Isso obriga o Django a procurar a pasta "static" na raiz e dentro de qualquer app
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
-# Configuração robusta do WhiteNoise para produção
+# Isso força o Render a vasculhar as pastas static de dentro dos apps (como 'cadastros', 'atribuicao', etc.)
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
+]
+
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
@@ -119,7 +123,6 @@ STORAGES = {
         "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
     },
 }
-
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
