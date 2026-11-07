@@ -25,4 +25,5 @@ urlpatterns = [
     path('api/cadastros/', include('cadastros.api_urls')),
     path('atribuicao/', include('atribuicao.urls')),
     path('relatorios/', include('relatorios.urls')),
+    
 ]

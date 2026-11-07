@@ -2,7 +2,7 @@ from django.views.generic import TemplateView
 
 class CentralRelatoriosView(TemplateView):
     """View central da secretaria para exibição de relatórios e dados institucionais."""
-    template_name = 'relatorios/central.html'
+    template_name = 'atribuicao/relatorios.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

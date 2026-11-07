@@ -115,7 +115,8 @@ MENU_NAVEGACAO = [   {
                     "adicionar-ata-pessoa", "excluir-ata-pessoa",
                 ],
             },
-            {"label": "Relatórios", "url_name": None, "chave": "relatorios-secretaria"},
+         {"label": "Relatórios", "url_name": "central_relatorios"},
+
         ],
     },
     {
