@@ -10,7 +10,7 @@ from cadastros.views import ModalCrudMixin
 
 from .forms import (
     AdicionarMatriculaTurmaForm, EditarMatriculaTurmaForm, FinalizarPlanejamentoForm,
-    EditarStatusMatriculaForm, AtribuicaoInstrutorForm, HorarioAulaForm
+    EditarStatusMatriculaForm, AtribuicaoInstrutorForm, HorarioAulaForm, RegistroInstrucaoForm
 )
 from .models import MatriculaTurma, StatusMatriculaTurma, RegistroInstrucao, HorarioAula, Atribuicao, ContratoFinanceiro
 
@@ -146,13 +146,45 @@ class EncerrarTurmaView(View):
 # DIÁRIO DE CLASSE, HORÁRIOS E RELATÓRIOS GLOBAIS
 # =========================================================================
 
+from django.shortcuts import render, redirect
+from .models import RegistroInstrucao
+from .forms import RegistroInstrucaoForm  
+
 def registro_instrucao_view(request):
-    """Visualização padrão do registro de conteúdos diários."""
+    """Visualização e gravação manual do registro de conteúdos diários."""
+    
+    if request.method == "POST":
+        # 1. Pega os valores exatamente como estão descritos no 'name' do seu HTML:
+        data_instrucao = request.POST.get('data_instrucao')
+        carga_horaria = request.POST.get('carga_horaria')
+        tipo_recebido = request.POST.get('tipo')      # Pega do name="tipo"
+        conteudo_recebido = request.POST.get('conteudo')  # Pega do name="conteudo"
+        
+        # 2. IMPORTANTE: Precisamos vincular a uma atribuição ativa.
+        # Como teste para funcionar imediatamente, vamos pegar a primeira atribuição existente.
+        # (Depois você pode mudar para pegar a atribuição vinda da URL ou da sessão)
+        from .models import Atribuicao # Ajuste o import se o modelo Atribuicao estiver em outro arquivo
+        atribuicao_atual = Atribuicao.objects.first() 
+        
+        if atribuicao_atual and data_instrucao and carga_horaria:
+            # 3. Cria e grava diretamente no banco de dados usando os campos do seu Model
+            RegistroInstrucao.objects.create(
+                atribuicao=atribuicao_atual,
+                data_instrucao=data_instrucao,
+                carga_horaria=carga_horaria,
+                tipo_instrucao=tipo_recebido,       # Atribui ao campo do model
+                conteudo_programatico=conteudo_recebido # Atribui ao campo do model
+            )
+            return redirect(request.path) # Recarrega a página limpa e salva
+        else:
+            print("Erro: Faltam dados obrigatórios ou nenhuma Atribuição foi encontrada no sistema.")
+
+    # Busca padrão para listar na tabela do lado direito (GET)
     registros = RegistroInstrucao.objects.select_related(
         'atribuicao__instrutor__pessoa', 'atribuicao__disciplina', 'atribuicao__turma'
     ).order_by('-data_instrucao')
+    
     return render(request, 'atribuicao/registro_instrucao.html', {'registros': registros})
-
 
 def horarios_view(request):
     """Gerencia a alocação de horários oficiais acoplados na grade semanal."""
@@ -210,8 +242,41 @@ def dashboard_gestao_view(request):
     })
 
 
+from django.shortcuts import render, redirect
+from django.db.models import Sum
+from .models import ContratoFinanceiro
+from .forms import ContratoFinanceiroForm  # Certifique-se de que o ContratoFinanceiroForm existe no seu forms.py
+
 def contratos_gestao_view(request):
-    return render(request, 'atribuicao/contratos.html')
+    """Visualização, cálculo dinâmico e inserção de contratos financeiros."""
+    
+    # 1. SE O USUÁRIO CLICOU EM GRAVAR (POST)
+    if request.method == "POST":
+        form = ContratoFinanceiroForm(request.POST)
+        if form.is_valid():
+            form.save()  # Salva o novo contrato digitado no banco de dados!
+            return redirect(request.path)  # Recarrega a página limpa com os dados salvos
+        else:
+            print("ERROS DE VALIDAÇÃO DO CONTRATO:", form.errors)
+    else:
+        form = ContratoFinanceiroForm()
+
+    # 2. CÁLCULO DOS VALORES REAIS DO BANCO (Substituindo o valor fixo de 150.000,00)
+    soma_real = ContratoFinanceiro.objects.filter(status='VIGENTE').aggregate(total=Sum('valor_total_empenhado'))['total'] or 0
+    total_contratos_vigentes = ContratoFinanceiro.objects.filter(status='VIGENTE').count()
+    
+    # 3. BUSCA A LISTA COMPLETA DE CONTRATOS PARA EXIBIR NA TABELA
+    contratos = ContratoFinanceiro.objects.all().order_by('-id')
+
+    # 4. MONTA O CONTEXTO DINÂMICO PARA O HTML
+    contexto_financeiro = {
+        'form': form,
+        'total_contratos': total_contratos_vigentes,
+        'total_empenhado': soma_real,
+        'contratos': contratos
+    }
+    
+    return render(request, 'atribuicao/contratos.html', contexto_financeiro)
 
 
 # =========================================================================
@@ -268,63 +333,96 @@ class AuditoriaInternaListView(ListView):
             'atribuicao_funcao__pessoa', 'turma', 'ata_inicio', 'ata_encerramento'
         ).order_by('-id')
 
+from django.views import View
+from django.shortcuts import render, redirect
+from django.db.models import Sum
 from django.utils import timezone
 
-class IndicadoresQualidadeView(TemplateView):
-    """Métricas institucionais consolidadas com filtro dropdown dinâmico de Ano Letivo."""
-    template_name = 'atribuicao/indicadores.html'
+from cadastros.models import Turma  # <--- Turma vem do app cadastros!
+# ADICIONADO MedicaoContrato NA IMPORTAÇÃO ABAIXO:
+from .models import MatriculaTurma, StatusMatriculaTurma, ContratoFinanceiro, MedicaoContrato  
+from .forms import ContratoFinanceiroForm # Certifique-se de importar o formulário correspondente
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        
-        # 1. CAPTURA O ANO CIVIL ATUAL DO SERVIDOR (2026)
+
+class IndicadoresQualidadeView(View):
+    """Métricas institucionais consolidadas com inserção direta de contratos financeiros."""
+
+    def get_context_data(self, request, ano_selecionado):
+        """Função auxiliar para agrupar os cálculos matemáticos da tela."""
         ano_atual = timezone.now().year
         
-        # CAPTURA O ANO SELECIONADO NA SETA (Se vazio, adota o ano atual por padrão)
-        ano_selecionado = self.request.GET.get('ano_letivo')
-        if not ano_selecionado:
-            ano_selecionado = str(ano_atual)
-        
-        # 2. LISTA RETROATIVA GARANTIDA: Cria uma lista com os últimos 5 anos anteriores automaticamente
+        # Lista retroativa garantida de anos
         anos_validos = [ano_atual - i for i in range(6)]
-        
-        # 3. CORREÇÃO 1: Busca o campo correto 'ano_letivo' no banco, e não o status
         anos_banco = Turma.objects.values_list('ano_letivo', flat=True).distinct()
         for item in anos_banco:
             if item:
-                try:
-                    anos_validos.append(int(item))
-                except ValueError:
-                    pass
-        
+                try: anos_validos.append(int(item))
+                except ValueError: pass
         
         anos_finais = sorted(list(set(anos_validos)), reverse=True)
 
-        # 4. CORREÇÃO 2: Filtra as matrículas pelo ANO_LETIVO correto da turma
+        # Filtros de matrículas e indicadores de qualidade
         matriculas_do_ano = MatriculaTurma.objects.filter(turma__ano_letivo=ano_selecionado)
         total_geral = matriculas_do_ano.count()
         
-        # Cruzamento de dados agregados com as matrículas filtradas de verdade
-        context['cursando'] = matriculas_do_ano.filter(status=StatusMatriculaTurma.CURSANDO).count()
-        context['aprovados'] = matriculas_do_ano.filter(status=StatusMatriculaTurma.APROVADO).count()
-        context['reprovados'] = matriculas_do_ano.filter(status=StatusMatriculaTurma.REPROVADO).count()
+        cursando = matriculas_do_ano.filter(status=StatusMatriculaTurma.CURSANDO).count()
+        aprovados = matriculas_do_ano.filter(status=StatusMatriculaTurma.APROVADO).count()
+        reprovados = matriculas_do_ano.filter(status=StatusMatriculaTurma.REPROVADO).count()
         
-        # CORREÇÃO 3: Proteção contra divisão por zero no cálculo da evasão
         if total_geral > 0:
             evasao_count = matriculas_do_ano.filter(
                 status__in=[StatusMatriculaTurma.TRANSFERIDO, StatusMatriculaTurma.MATRICULA_EXCLUIDA]
             ).count()
-            context['taxa_evasao'] = round((evasao_count / total_geral) * 100, 1)
+            taxa_evasao = round((evasao_count / total_geral) * 100, 1)
         else:
-            context['taxa_evasao'] = 0.0
+            taxa_evasao = 0.0
         
-        # CORREÇÃO 4: Filtra apenas contratos 'VIGENTE' (conforme seu modelo) para a soma de contratos ativos
-        soma_banco = ContratoFinanceiro.objects.filter(status='VIGENTE').aggregate(total=Sum('valor'))['total'] or 0
-        context['total_contratos'] = f"{soma_banco:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        # DADOS FINANCEIROS DINÂMICOS DO BANCO:
+        soma_real = ContratoFinanceiro.objects.filter(status='VIGENTE').aggregate(total=Sum('valor_total_empenhado'))['total'] or 0
+        total_contratos_formatado = f"{soma_real:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         
-        # Envia os seletores estruturados para o arquivo HTML
-        context['anos_disponiveis'] = anos_finais
-        context['ano_selecionado'] = int(ano_selecionado)
-        
-        return context
+        # Contagem total de contratos vigentes para o primeiro card
+        total_vigentes = ContratoFinanceiro.objects.filter(status='VIGENTE').count()
 
+        # =========================================================================
+        # CÁLCULO REAL E DINÂMICO DAS MEDIÇÕES PENDENTES PARA O CARD AMARELO
+        # =========================================================================
+        soma_pendente = MedicaoContrato.objects.filter(status='PENDENTE').aggregate(total=Sum('valor_medido'))['total'] or 0
+        total_pendente_formatado = f"{soma_pendente:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        # =========================================================================
+
+        return {
+            'cursando': cursando,
+            'aprovados': aprovados,
+            'reprovados': reprovados,
+            'taxa_evasao': taxa_evasao,
+            'total_contratos': total_contratos_formatado,
+            'total_vigentes': total_vigentes,
+            'medicoes_pendentes': total_pendente_formatado, # <-- Enviado com sucesso para o HTML
+            'anos_disponiveis': anos_finais,
+            'ano_selecionado': int(ano_selecionado),
+        }
+
+    def get(self, request, *args, **kwargs):
+        """Renderiza a página quando o usuário entra para visualizar (GET)."""
+        ano_atual = timezone.now().year
+        ano_selecionado = request.GET.get('ano_letivo', str(ano_atual))
+        
+        context = self.get_context_data(request, ano_selecionado)
+        context['form'] = ContratoFinanceiroForm()
+        
+        return render(request, 'atribuicao/indicadores.html', context)
+
+    def post(self, request, *args, **kwargs):
+        """Processa o salvamento quando o usuário envia o formulário (POST)."""
+        form = ContratoFinanceiroForm(request.POST)
+        if form.is_valid():
+            form.save()  # Salva o novo contrato financeiro no banco de dados!
+            return redirect(request.path)  # Recarrega a página limpa com os dados salvos
+        
+        # Caso o formulário falhe, recarrega a página exibindo os erros
+        ano_atual = timezone.now().year
+        ano_selecionado = request.GET.get('ano_letivo', str(ano_atual))
+        context = self.get_context_data(request, ano_selecionado)
+        context['form'] = form
+        return render(request, 'atribuicao/indicadores.html', context)

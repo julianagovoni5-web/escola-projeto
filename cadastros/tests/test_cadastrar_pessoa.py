@@ -165,10 +165,10 @@ class TestCadastrarPessoaComFuncaoService:
         )
 
         assert dados_docente is None
-        assert ExperienciaProfissional.objects.filter(atribuicao=atribuicao).count() == 2
+        assert ExperienciaProfissional.objects.filter(pessoa=pessoa).count() == 2
 
     def test_historico_vinculo_formal_criado_para_docente_e_gestao_nunca_discente(self):
-        vinculo_formal = VinculoFormal.objects.create(nome="FAPETI")
+        vinculo_formal = VinculoFormal.objects.create(tipo_vinculo="FAPETI")
 
         funcao_docente = Funcao.objects.create(nome="Docente - Instrutor 2", categoria="DOCENTE")
         funcao_gestao = Funcao.objects.create(nome="Secretaria 2", categoria="GESTAO")

@@ -44,7 +44,9 @@
             </div>
             <div style="display: flex; gap: 10px;">
                 <a href="#" class="btn btn-outline-secondary btn-sm" style="padding: 6px 12px; font-size: 13px;">Visualizar Dados</a>
-                <a href="#" class="btn btn-dark btn-sm" style="padding: 6px 12px; font-size: 13px; background-color: #212529; color: #fff; text-decoration: none; border-radius: 4px;">Exportar PDF</a>
+                
+                <!-- BOTAO EXPORTAR PDF ATUALIZADO ABAIXO: -->
+                <a href="{% url 'exportar_pdf' %}" class="btn btn-dark btn-sm" style="padding: 6px 12px; font-size: 13px; background-color: #212529; color: #fff; text-decoration: none; border-radius: 4px;">Exportar PDF</a>
             </div>
         </div>
 
@@ -55,7 +57,7 @@
                 <span style="color: #666; font-size: 13px;">Gera o documento de conferência física de horas ministradas por período letivo.</span>
             </div>
             <div>
-                <a href="#" class="btn btn-primary btn-sm" style="padding: 6px 16px; font-size: 13px; background-color: #0d6efd; color: #fff; text-decoration: none; border-radius: 4px; display: inline-block;">Acessar Registros</a>
+                <a href="{% url 'registro_instrucao' %}" class="btn btn-primary btn-sm" style="padding: 6px 16px; font-size: 13px; background-color: #0d6efd; color: #fff; text-decoration: none; border-radius: 4px; display: inline-block;">Acessar Registros</a>
             </div>
         </div>
 

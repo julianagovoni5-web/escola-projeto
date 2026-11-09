@@ -80,7 +80,7 @@ Classes:
 
 Regras de negócio complexas ficam em services.py, não aqui.
 """
-
+from django.utils import timezone
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -545,18 +545,6 @@ class Funcao(models.Model):
         return self.nome
 
 
-class VinculoFormal(models.Model):
-    """
-    Catálogo aberto de entidades de vínculo formal/contratual (ex: FAPETI, PMT).
-    Evita erro de digitação num dado que se repete e pode mudar com o tempo — mesmo
-    raciocínio já aplicado a Funcao. Aplica-se só a Docente e Gestão, nunca a Discente.
-    """
-    nome = models.CharField(max_length=100, unique=True)
-
-    def __str__(self):
-        return self.nome
-
-
 class RequisitoContratacao(models.TextChoices):
     """Critério de contratação (RBAC 141), aplicável a Docente e Gestão — escolha única."""
     EXPERIENCIA_DOCENTE = 'EXPERIENCIA_DOCENTE', 'Experiência docente comprovada (6 meses geral + 6 meses na área específica)'
@@ -614,7 +602,7 @@ class HistoricoVinculoFormal(models.Model):
     (ex: FAPETI de 2025 a 2026, depois FUSSUSS a partir de 2026, em aberto).
     """
     atribuicao = models.ForeignKey(AtribuicaoFuncao, on_delete=models.CASCADE, related_name='historico_vinculo_formal')
-    vinculo_formal = models.ForeignKey(VinculoFormal, on_delete=models.PROTECT, related_name='historicos')
+    vinculo_formal = models.ForeignKey('cadastros.VinculoFormal', on_delete=models.CASCADE)
     data_inicio = models.DateField()
     data_fim = models.DateField(null=True, blank=True)
     observacao = models.TextField(
@@ -765,13 +753,37 @@ class Capacidade(models.Model):
             )
         ]
 
-
 class ExperienciaProfissional(models.Model):
-    atribuicao = models.ForeignKey(AtribuicaoFuncao, on_delete=models.CASCADE, related_name='experiencias_profissionais')
-    organizacao = models.CharField(max_length=200)
-    cargo = models.CharField(max_length=100)
-    data_inicio = models.DateField()
-    data_fim = models.DateField(null=True, blank=True)
+    """Registra a bagagem do colaborador em outras instituições antes da EMCA."""
+    pessoa = models.ForeignKey('Pessoa', on_delete=models.CASCADE, related_name='experiencias_profissionais', default=1)
+    organizacao = models.CharField(max_length=255, verbose_name="Instituição/Empresa")
+    cargo = models.CharField(max_length=100, verbose_name="Cargo/Função")
+    data_inicio = models.DateField(verbose_name="Data de Início", default=timezone.now)
+    data_fim = models.DateField(null=True, blank=True, verbose_name="Data de Fim")
+
+    class Meta:
+        verbose_name = "Experiência Profissional"
+        verbose_name_plural = "Experiências Profissionais"
+        ordering = ['-data_inicio']
 
     def __str__(self):
         return f"{self.cargo} em {self.organizacao}"
+
+
+class VinculoFormal(models.Model):
+    """Registra a evolução contratual e portarias do funcionário dentro da EMCA."""
+    pessoa = models.ForeignKey('Pessoa', on_delete=models.CASCADE, related_name='vinculos_formais', default=1)
+    tipo_vinculo = models.CharField(max_length=100, verbose_name="Tipo de Vínculo", default="Não Informado")  
+    numero_documento = models.CharField(max_length=100, blank=True, null=True, verbose_name="Número do Documento/Portaria")
+    carga_horaria = models.PositiveIntegerField(verbose_name="Carga Horária Semanal", default=40)
+    data_admissao = models.DateField(verbose_name="Data de Admissão", default=timezone.now)
+    data_rescisao = models.DateField(null=True, blank=True, verbose_name="Data de Rescisão/Desligamento")
+
+    class Meta:
+        verbose_name = "Histórico de Vínculo Formal"
+        verbose_name_plural = "Históricos de Vínculos Formais"
+        ordering = ['-data_admissao']
+        
+
+    def __str__(self):
+        return f"{self.tipo_vinculo} - {self.numero_documento or 'Sem Nº'}"

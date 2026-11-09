@@ -6,18 +6,37 @@ class CentralRelatoriosView(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        ano_atual = timezone.now().year
         
         # Imports locais seguros
-        from cadastros.models import AtribuicaoFuncao
-        from django.db.models import Q
+        from cadastros.models import AtribuicaoFuncao, Turma, Pessoa
+        from atribuicao.models import MatriculaTurma, StatusMatriculaTurma, RegistroInstrucao
+        from django.db.models import Q, Sum
         
-        # Sua busca para o menu lateral
+        # 1. Busca para o menu lateral
         context['instrutores'] = AtribuicaoFuncao.objects.select_related('pessoa').exclude(
             Q(funcao__nome__icontains='aluno') | 
             Q(funcao__nome__icontains='discente')
         ).order_by('pessoa__nome_completo')
         
+        # 2. CARD 1: Total de Horas Ministradas (Soma real das aulas gravadas)
+        horas_sub = RegistroInstrucao.objects.aggregate(total=Sum('carga_horaria'))['total'] or 0
+        context['total_horas'] = f"{horas_sub:.0f}h"
+
+        # 3. CARD 2: Matrículas Ativas (Alunos ativos cadastrados no sistema)
+        context['total_matriculas'] = Pessoa.objects.filter(
+            ativo=True, 
+            atribuicoes__funcao__categoria='DISCENTE'
+        ).distinct().count()
+
+        # 4. CARD 3: Total de Atribuições (Turmas em andamento no ano atual)
+        context['total_atribuicoes'] = Turma.objects.filter(
+            status='EM_ANDAMENTO', 
+            ano_letivo=ano_atual
+        ).count()
+        
         return context
+    
 import os
 from django.conf import settings
 from django.http import HttpResponse

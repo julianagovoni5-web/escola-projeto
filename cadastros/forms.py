@@ -167,7 +167,16 @@ class CadastrarPessoaForm(forms.Form):
         # 'max' calculado a cada instância (não um valor fixo) — sempre a
         # data de hoje, real, no momento em que o formulário é exibido.
         self.fields['data_nascimento'].widget.attrs['max'] = date.today().isoformat()
-
+        
+        from django.db.models import Q
+        self.fields['funcao'].queryset = Funcao.objects.filter(
+            Q(nome__icontains='docente') | 
+            Q(nome__icontains='discente') | 
+            Q(nome__icontains='gestão') |
+            Q(nome__icontains='gestao') |
+            Q(nome__icontains='aluno')
+        ).order_by('nome')
+    
     def clean_data_nascimento(self):
         return _validar_data_nascimento_nao_futura(self.cleaned_data.get('data_nascimento'))
 
@@ -217,9 +226,15 @@ class ExperienciaProfissionalForm(forms.Form):
 
 class HistoricoVinculoFormalForm(forms.Form):
     """1 linha de Vínculo Formal (Docente ou Gestão — nunca Discente), usada só no cadastro INICIAL (Formset)."""
+    
+    # 1. PASSAMOS O QUERYSET DO PROPRIO MODELO PARA MATAR O TYPEERROR DE UMA VEZ POR TODAS:
     vinculo_formal = forms.ModelChoiceField(
-        queryset=VinculoFormal.objects.all(), required=False, label="Vínculo Formal"
+        queryset=VinculoFormal.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label="Vínculo Formal"
     )
+    
     data_inicio = forms.DateField(
         required=False, label="Data de início", widget=forms.DateInput(attrs={'type': 'date'})
     )
@@ -227,10 +242,31 @@ class HistoricoVinculoFormalForm(forms.Form):
         required=False, label="Data de fim", widget=forms.DateInput(attrs={'type': 'date'})
     )
 
+    # 2. SOBRESCREVEMOS AS OPÇÕES NA INICIALIZAÇÃO PARA DEIXAR APENAS DOCENTE E GESTÃO VISÍVEIS:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['vinculo_formal'].choices = [
+            ('', '---------'),
+            ('docente', 'Docente'),
+            ('gestao', 'Gestão'),
+        ]
+
     def clean(self):
         cleaned_data = super().clean()
-        if cleaned_data.get('vinculo_formal') and not cleaned_data.get('data_inicio'):
+        vinculo_escolhido = cleaned_data.get('vinculo_formal')
+        
+        if vinculo_escolhido and not cleaned_data.get('data_inicio'):
             self.add_error('data_inicio', "Obrigatório quando o Vínculo Formal é preenchido.")
+            
+        # 3. TRADUÇÃO DE INSTÂNCIA: Garante compatibilidade relacional com o Service
+        if vinculo_escolhido:
+            # Se for string, busca o objeto real correspondente
+            if isinstance(vinculo_escolhido, str):
+                instancia = VinculoFormal.objects.filter(tipo_vinculo__icontains=vinculo_escolhido).first()
+                if not instancia:
+                    instancia = VinculoFormal.objects.first()
+                cleaned_data['vinculo_formal'] = instancia
+            
         return cleaned_data
 
 
@@ -651,10 +687,10 @@ FormacaoDocenteFormSet = forms.formset_factory(FormacaoDocenteForm, extra=1)
 ExperienciaProfissionalFormSet = forms.formset_factory(ExperienciaProfissionalForm, extra=1)
 HistoricoVinculoFormalFormSet = forms.formset_factory(HistoricoVinculoFormalForm, extra=1)
 PendenciaCadastroFormSet = forms.formset_factory(PendenciaCadastroForm, extra=1)
-# LOCALIZAÇÃO: Fim do arquivo cadastros/forms.py
 
 from django import forms
-from atribuicao.models import ContratoFinanceiro
+# IMPORTAÇÃO CORRETA: Traz os dois modelos do aplicativo onde eles realmente existem!
+from atribuicao.models import ContratoFinanceiro, MedicaoContrato
 
 class ContratoFinanceiroModelForm(forms.ModelForm):
     """
@@ -695,6 +731,17 @@ class ContratoFinanceiroModelForm(forms.ModelForm):
         
         return cleaned_data
 
+class MedicaoContratoForm(forms.ModelForm):
+    class Meta:
+        model = MedicaoContrato
+        fields = ['contrato', 'numero_parcela', 'valor_medido', 'status']
+        widgets = {
+            'contrato': forms.Select(attrs={'style': 'width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem;'}),
+            'numero_parcela': forms.NumberInput(attrs={'style': 'width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem;', 'placeholder': 'Ex: 1'}),
+            'valor_medido': forms.NumberInput(attrs={'style': 'width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem;', 'placeholder': 'Ex: 4500.00', 'step': '0.01'}),
+            'status': forms.Select(attrs={'style': 'width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem;'}),
+        }
+
 
 from django import forms
 from atribuicao.models import Atribuicao
@@ -720,3 +767,5 @@ class AtribuicaoInstrutorForm(forms.ModelForm):
             forms.models.Q(cargo__icontains='aluno') | 
             forms.models.Q(cargo__icontains='discente')
         ).order_by('pessoa__nome_completo')
+
+

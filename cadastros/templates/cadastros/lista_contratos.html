@@ -1,67 +1,269 @@
-{% extends 'nucleo/base.html' %}
+{% extends 'base.html' %}
 
-{% block conteudo %}
-<div class="container-fluid px-4 py-3">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+{% block content %}
+<div style="padding: 24px; font-family: 'Segoe UI', system-ui, sans-serif; background-color: #f8fafc; min-height: 100vh; box-sizing: border-box;">
+    
+    <!-- Cabeçalho Principal -->
+    <div style="margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
         <div>
-            <h2 class="fw-bold text-dark"><i class="bi bi-file-earmark-text-fill text-primary"></i> Gestão de Contratos</h2>
-            <p class="text-muted m-0">Controle licitatório e contratos de prestação de serviços.</p>
+            <h2 style="color: #002060; margin: 0 0 4px 0; font-weight: 700; font-size: 1.5rem;">💰 Gestão de Contratos Financeiros</h2>
+            <span style="color: #64748b; font-size: 14px;">Controle licitatório e contratos de prestação de serviços da instituição.</span>
         </div>
-        <!-- Botão preparado para disparar o ModalCrudMixin do seu sistema -->
-        <div>
-            <button class="btn btn-primary btn-modal-crud" data-url="{% url 'adicionar-contrato' %}">
-                <i class="bi bi-plus-lg"></i> Novo Contrato
-            </button>
+        <div style="background-color: #002060; color: white; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            Ano Letivo 2026
         </div>
     </div>
 
-    <!-- Tabela Corporativa -->
-    <div class="card shadow-sm">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th class="ps-4">Contrato</th>
-                            <th>Tipo</th>
-                            <th>Credor / Beneficiário</th>
-                            <th>Valor Total</th>
-                            <th>Vigência</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for contrato in contratos %}
-                        <tr>
-                            <td class="ps-4">
-                                <span class="fw-bold d-block text-dark">{{ contrato.numero_contrato }}</span>
-                                <small class="text-muted">Proc: {{ contrato.numero_processo }}</small>
-                            </td>
-                            <td><span class="badge bg-light text-dark border">{{ contrato.get_tipo_display }}</span></td>
-                            <td>
-                                {% if contrato.instrutor %}
-                                    {{ contrato.instrutor.get_full_name|default:contrato.instrutor.username }}
-                                {% else %}
-                                    {{ contrato.credor_razao_social }}
-                                {% endif %}
-                            </td>
-                            <td class="fw-bold">R$ {{ contrato.valor_total_empenhado }}</td>
-                            <td><small>{{ contrato.data_vigencia_inicio|date:"d/m/Y" }} até {{ contrato.data_vigencia_fim|date:"d/m/Y" }}</small></td>
-                            <td>
-                                <span class="badge {% if contrato.status == 'VIGENTE' %}bg-success{% else %}bg-secondary{% endif %}">
-                                    {{ contrato.get_status_display }}
-                                </span>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="6" class="text-center py-5 text-muted">Nenhum contrato cadastrado.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    <!-- Barra de Busca Integrada -->
+    <div style="margin-bottom: 24px; background: white; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+        <form method="GET" style="display: flex; gap: 12px;">
+            <input type="text" name="busca" value="{{ filtro_busca }}" placeholder="Buscar por número do contrato, credor ou instrutor..." style="flex: 1; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; box-sizing: border-box;">
+            <button type="submit" style="background-color: #002060; color: white; border: none; padding: 0 24px; border-radius: 6px; font-weight: 600; font-size: 0.9rem; cursor: pointer;">🔍 Buscar</button>
+            {% if filtro_busca %}
+                <a href="{% url 'contratos' %}" style="display: flex; align-items: center; background-color: #e2e8f0; color: #334155; text-decoration: none; padding: 0 16px; border-radius: 6px; font-weight: 600; font-size: 0.9rem;">Limpar</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- CONTAINER GRID PRINCIPAL: Duas colunas rígidas lado a lado -->
+    <div style="display: grid; grid-template-columns: 360px 1fr; gap: 24px; align-items: flex-start; width: 100%; box-sizing: border-box;">
+
+        <!-- ================= COLUNA DA ESQUERDA (Formulários e KPIs) ================= -->
+        <div style="display: flex; flex-direction: column; gap: 20px; box-sizing: border-box;">
+            
+            <!-- FORMULÁRIO 1: Lançar Novo Contrato -->
+            <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); box-sizing: border-box;">
+                <h4 style="margin-top: 0; color: #002060; font-weight: 700; border-bottom: 2px solid #002060; padding-bottom: 8px; margin-bottom: 16px; font-size: 1.1rem;">Lançar Novo Contrato</h4>
+                
+                {% if form_errors and request.POST.action == 'gravar_contrato' %}
+                <div style="background-color: #fef2f2; color: #991b1b; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 0.85rem; border: 1px solid #fee2e2;">
+                    <strong>⚠️ Erro ao salvar contrato:</strong> {{ form_errors }}
+                </div>
+                {% endif %}
+
+                <form method="POST" style="display: flex; flex-direction: column; gap: 14px;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="gravar_contrato">
+
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 4px;">N° do Contrato:</label>
+                        <input type="text" name="numero_contrato" placeholder="Ex: 123/2026" required style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 0.9rem;">
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 4px;">N° do Processo / Identificador:</label>
+                        <input type="text" name="numero_processo" placeholder="Ex: PROC-456/2026" required style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 0.9rem;">
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 4px;">Credor / Razão Social:</label>
+                        <input type="text" name="credor_razao_social" placeholder="Razão Social Ltda" required style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 0.9rem;">
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 4px;">Tipo de Contrato:</label>
+                        <select name="tipo" required style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: white; box-sizing: border-box; font-size: 0.9rem;">
+                            <option value="INSTRUTOR">Contrato de Trabalho - Instrutor</option>
+                            <option value="TERCEIRIZADO" selected>Prestação de Serviços (Empresas)</option>
+                            <option value="REPASSE">Convênio / Repasse de Verba</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 4px;">Valor Total Empenhado (R$):</label>
+                        <input type="number" step="0.01" name="valor_total_empenhado" placeholder="Ex: 50000.00" required style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 0.9rem;">
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 4px;">Data de Assinatura:</label>
+                        <input type="date" name="data_assinatura" required style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 0.9rem;">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 4px;">Início Vigência:</label>
+                            <input type="date" name="data_vigencia_inicio" required style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 0.9rem;">
+                        </div>
+                        <div>
+                            <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 4px;">Fim Vigência:</label>
+                            <input type="date" name="data_vigencia_fim" required style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 0.9rem;">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 4px;">Objeto do Contrato:</label>
+                        <textarea name="objeto_contrato" placeholder="Descrição resumida do serviço..." required style="width: 100%; height: 60px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; resize: vertical; font-family: sans-serif; font-size: 0.9rem;"></textarea>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 4px;">Status do Contrato:</label>
+                        <select name="status" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: white; box-sizing: border-box; font-size: 0.9rem;">
+                            <option value="VIGENTE" selected>Vigente</option>
+                            <option value="ENCERRADO">Encerrado</option>
+                            <option value="CANCELADO">Cancelado</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" style="width: 100%; background-color: #002060; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; font-size: 0.95rem; cursor: pointer;">
+                        Gravar Contrato no Sistema
+                    </button>
+                </form>
             </div>
-        </div>
-    </div>
-</div>
+            <!-- FORMULÁRIO 2: Lançar Nova Medição de Parcela -->
+            <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); box-sizing: border-box;">
+                <h4 style="margin-top: 0; color: #002060; font-weight: 700; border-bottom: 2px solid #f59e0b; padding-bottom: 8px; margin-bottom: 16px; font-size: 1.1rem;">Lançar Medição / Parcela</h4>
+                
+                {% if form_errors and request.POST.action == 'gravar_medicao' %}
+                <div style="background-color: #fef2f2; color: #991b1b; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 0.85rem; border: 1px solid #fee2e2;">
+                    <strong>⚠️ Erro ao salvar medição:</strong> {{ form_errors }}
+                </div>
+                {% endif %}
+
+                <form method="POST" style="display: flex; flex-direction: column; gap: 14px;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="gravar_medicao">
+
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 4px;">Vincular ao Contrato:</label>
+                        <select name="contrato" required style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: white; box-sizing: border-box; font-size: 0.9rem;">
+                            {% for c in contratos %}
+                                <option value="{{ c.id }}">{{ c.numero_contrato }} - {{ c.credor_razao_social|truncatechars:20 }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 4px;">Número da Parcela / Medição:</label>
+                        <input type="number" name="numero_parcela" placeholder="Ex: 1" min="1" required style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 0.9rem;">
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 4px;">Valor Líquido Medido (R$):</label>
+                        <input type="number" step="0.01" name="valor_medido" placeholder="Ex: 4500.00" required style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 0.9rem;">
+                    </div>
+
+                    <div>
+                        <label style="display: block; font-weight: 600; font-size: 0.85rem; color: #334155; margin-bottom: 4px;">Status da Medição:</label>
+                        <select name="status" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background-color: white; box-sizing: border-box; font-size: 0.9rem;">
+                            <option value="PENDENTE" selected>Pendente de Aprovação</option>
+                            <option value="APROVADO">Aprovado / Pago</option>
+                            <option value="REJEITADO">Rejeitado / Com Falha</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" style="width: 100%; background-color: #f59e0b; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; font-size: 0.95rem; cursor: pointer;">
+                        Gravar Parcela no Card Amarelo
+                    </button>
+                </form>
+            </div>
+
+            <!-- BLOCO DE INDICADORES (KPIs) -->
+            <div style="display: flex; flex-direction: column; gap: 12px; box-sizing: border-box;">
+                <div style="background: white; border: 1px solid #e2e8f0; border-left: 4px solid #3b82f6; border-radius: 8px; padding: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                    <span style="display: block; color: #64748b; font-size: 0.7rem; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 4px;">Contratos Vigentes</span>
+                    <strong style="display: block; color: #0f172a; font-size: 1.75rem; line-height: 1.2;">{{ total_contratos }}</strong>
+                    <span style="display: block; color: #64748b; font-size: 0.75rem; margin-top: 2px;">Processos licitatórios ativos</span>
+                </div>
+
+                <div style="background: white; border: 1px solid #e2e8f0; border-left: 4px solid #10b981; border-radius: 8px; padding: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                    <span style="display: block; color: #64748b; font-size: 0.7rem; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 4px;">Saldo Total Empenhado</span>
+                    <strong style="display: block; color: #10b981; font-size: 1.5rem; line-height: 1.2;">R$ {{ total_empenhado|floatformat:2 }}</strong>
+                    <span style="display: block; color: #64748b; font-size: 0.75rem; margin-top: 2px;">Capital total investido</span>
+                </div>
+
+                <div style="background: white; border: 1px solid #e2e8f0; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                    <span style="display: block; color: #64748b; font-size: 0.7rem; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 4px;">Medições Pendentes</span>
+                    <strong style="display: block; color: #f59e0b; font-size: 1.5rem; line-height: 1.2;">R$ {{ total_pendente|floatformat:2 }}</strong>
+                    <span style="display: block; color: #64748b; font-size: 0.75rem; margin-top: 2px;">Aguardando aprovação física</span>
+                </div>
+            </div>
+        </div> <!-- Fim da Coluna da Esquerda -->
+
+        <!-- ================= COLUNA DA DIREITA (Tabelas de Listagem) ================= -->
+        <div style="display: flex; flex-direction: column; gap: 32px; box-sizing: border-box; min-width: 0; width: 100%;">
+            
+            <!-- Tabela 1: Contratos Cadastrados -->
+            <div style="background: white; padding: 24px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); box-sizing: border-box;">
+                <h4 style="margin: 0 0 16px 0; color: #002060; font-weight: 700; font-size: 1.2rem; border-bottom: 2px solid #cbd5e1; padding-bottom: 8px;">Contratos Cadastrados</h4>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                        <thead>
+                            <tr style="background-color: #f1f5f9; border-bottom: 2px solid #cbd5e1; color: #334155;">
+                                <th style="padding: 12px 10px; font-weight: 600; width: 50px;">ID</th>
+                                <th style="padding: 12px 10px; font-weight: 600;">Nº Contrato</th>
+                                <th style="padding: 12px 10px; font-weight: 600;">Credor / Razão Social</th>
+                                <th style="padding: 12px 10px; font-weight: 600;">Objeto do Contrato</th>
+                                <th style="padding: 12px 10px; font-weight: 600;">Valor Empenhado</th>
+                                <th style="padding: 12px 10px; font-weight: 600; text-align: center; width: 100px;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for contrato in contratos %}
+                            <tr style="border-bottom: 1px solid #e2e8f0; color: #475569;">
+                                <td style="padding: 12px 10px; color: #94a3b8;">#{{ contrato.id }}</td>
+                                <td style="padding: 12px 10px; font-weight: 600; color: #0f172a;">{{ contrato.numero_contrato }}</td>
+                                <td style="padding: 12px 10px;">{{ contrato.credor_razao_social }}</td>
+                                <td style="padding: 12px 10px; max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ contrato.objeto_contrato }}">{{ contrato.objeto_contrato }}</td>
+                                <td style="padding: 12px 10px; font-weight: 600; color: #0f172a;">R$ {{ contrato.valor_total_empenhado|floatformat:2 }}</td>
+                                <td style="padding: 12px 10px; text-align: center;">
+                                    <span style="display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; 
+                                        {% if contrato.status == 'VIGENTE' %} background-color: #dcfce7; color: #15803d;
+                                        {% elif contrato.status == 'ENCERRADO' %} background-color: #f1f5f9; color: #475569;
+                                        {% else %} background-color: #fee2e2; color: #991b1b; {% endif %}">
+                                        {{ contrato.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" style="padding: 24px; text-align: center; color: #94a3b8;">Nenhum contrato localizado no sistema.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+                        <!-- Tabela 2: Acompanhamento de Medições (Parcelas) -->
+            <div style="background: white; padding: 24px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); box-sizing: border-box;">
+                <h4 style="margin: 0 0 16px 0; color: #002060; font-weight: 700; font-size: 1.2rem; border-bottom: 2px solid #f59e0b; padding-bottom: 8px;">Acompanhamento de Medições (Parcelas)</h4>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+                        <thead>
+                            <tr style="background-color: #fffbeb; border-bottom: 2px solid #fef3c7; color: #78350f;">
+                                <th style="padding: 12px 10px; font-weight: 600; width: 50px;">Ref</th>
+                                <th style="padding: 12px 10px; font-weight: 600;">Vínculo Contratual</th>
+                                <th style="padding: 12px 10px; font-weight: 600;">Valor Medido</th>
+                                <th style="padding: 12px 10px; font-weight: 600; text-align: center; width: 160px;">Status da Liberação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for medicao in medicoes %}
+                            <tr style="border-bottom: 1px solid #e2e8f0; color: #475569;">
+                                <td style="padding: 12px 10px; color: #94a3b8;">#{{ medicao.id }}</td>
+                                <td style="padding: 12px 10px; font-weight: 500;">Contrato: <strong style="color: #002060;">{{ medicao.contrato.numero_contrato }}</strong> (Parcela {{ medicao.numero_parcela }})</td>
+                                <td style="padding: 12px 10px; font-weight: 600; color: #10b981;">R$ {{ medicao.valor_medido|floatformat:2 }}</td>
+                                <td style="padding: 12px 10px; text-align: center;">
+                                    <span style="display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;
+                                        {% if medicao.status == 'APROVADO' %} background-color: #dcfce7; color: #15803d;
+                                        {% elif medicao.status == 'PENDENTE' %} background-color: #fef3c7; color: #d97706;
+                                        {% else %} background-color: #fee2e2; color: #991b1b; {% endif %}">
+                                        {{ medicao.get_status_display|default:medicao.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" style="padding: 24px; text-align: center; color: #94a3b8;">Nenhuma medição registrada para o ano letivo atual.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div> <!-- Fim da coluna da direita -->
+
+    </div> <!-- Fim do Container Grid Principal -->
+</div> <!-- Fim do padding geral -->
 {% endblock %}
+

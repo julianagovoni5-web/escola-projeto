@@ -1,116 +1,117 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<div style="padding: 24px; max-width: 1200px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif;">
+{% block conteudo %}
+<div class="container-fluid px-4 py-4" style="font-family: sans-serif;">
     
-    <!-- CABEÇALHO -->
-    <div style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
         <div>
-            <h2 style="color: #0f172a; margin: 0 0 4px 0; font-size: 1.75rem; font-weight: 700;">💳 Gestão de Contratos Financeiros</h2>
-            <p style="color: #64748b; margin: 0; font-size: 0.95rem;">Módulo financeiro de acompanhamento de contratos e parcelas ativas.</p>
+            <h2 class="fw-bold text-dark mb-1">💰 Gestão de Contratos Financeiros</h2>
+            <p class="text-muted small mb-0">Controle licitatório e contratos de prestação de serviços da instituição.</p>
+        </div>
+        <div class="text-end">
+            <span class="badge bg-primary px-3 py-2 fs-6 shadow-sm">Ano Letivo 2026</span>
         </div>
     </div>
 
-    <!-- CARDS DE RESUMO CORRIGIDOS (Com títulos e variáveis dinâmicas organizadas) -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px;">
+    <!-- Layout dividido em duas colunas -->
+    <div class="row g-4">
         
-        <!-- Card 1: Contratos Vigentes -->
-        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; border-left: 4px solid #3b82f6;">
-            <div style="color: #64748b; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Contratos Vigentes</div>
-            <div style="color: #0f172a; font-size: 1.5rem; font-weight: 700;">{{ total_vigentes }}</div>
-        </div>
-        
-        <!-- Card 2: Saldo Total Empenhado -->
-        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; border-left: 4px solid #10b981;">
-            <div style="color: #64748b; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Saldo Total Empenhado</div>
-            <div style="color: #0f172a; font-size: 1.5rem; font-weight: 700;">R$ {{ total_empenhado|floatformat:2 }}</div>
-        </div>
-        
-        <!-- Card 3: Medições Pendentes -->
-        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; border-left: 4px solid #f59e0b;">
-            <div style="color: #64748b; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Medições Pendentes</div>
-            <div style="color: #0f172a; font-size: 1.5rem; font-weight: 700;">--</div>
-        </div>
-    </div>
+        <!-- COLUNA DA ESQUERDA: Formulário de Inserção Rápida -->
+        <div class="col-12 col-lg-4">
+            <div class="card shadow-sm border-0 p-4">
+                <h5 class="fw-bold text-dark mb-2" style="border-bottom: 2px solid #0d6efd; padding-bottom: 6px;">Lançar Novo Contrato</h5>
+                
+                <form method="POST" class="mt-3">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-muted text-uppercase">Valor Total Empenhado (R$):</label>
+                        <input type="number" step="0.01" name="valor_total_empenhado" class="form-control shadow-sm" placeholder="Ex: 50000.00" required>
+                    </div>
 
-    <!-- FILTRO DE BUSCA -->
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-        <form method="GET" style="display: flex; gap: 12px; flex-wrap: wrap;">
-            <input type="text" name="pesquisa" value="{{ request.GET.pesquisa }}" placeholder="Buscar por número do contrato ou nome do instrutor..." 
-                   style="flex: 1; min-width: 260px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; outline: none; background-color: #f8fafc;">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-muted text-uppercase">Status Inicial:</label>
+                        <select name="status" class="form-select shadow-sm" required>
+                            <option value="VIGENTE">Vigente</option>
+                            <option value="ENCERRADO">Encerrado</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 fw-bold py-2 shadow-sm mt-2">
+                        Gravar Contrato no Sistema
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- COLUNA DA DIREITA: Seus indicadores e tabela -->
+        <div class="col-12 col-lg-8">
             
-            <select name="status" style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.9rem; background-color: #f8fafc; color: #334155;">
-                <option value="">Todos os Status</option>
-                <option value="VIGENTE" {% if request.GET.status == 'VIGENTE' %}selected{% endif %}>Vigente</option>
-                <option value="CONCLUIDO" {% if request.GET.status == 'CONCLUIDO' %}selected{% endif %}>Concluído</option>
-            </select>
-            
-            <button type="submit" style="background-color: #0f172a; color: #ffffff; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 500; font-size: 0.9rem; cursor: pointer;">
-                Filtrar
-            </button>
-        </form>
-    </div>
+            <!-- Linha de Cards Superiores -->
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-sm-6">
+                    <div class="card border-0 border-start border-primary border-4 shadow-sm h-100">
+                        <div class="card-body py-3">
+                            <span class="text-uppercase text-muted font-weight-bold btn-sm p-0">Contratos Vigentes</span>
+                            <h2 class="fw-bold text-primary my-1">{{ total_contratos }}</h2>
+                            <div class="text-muted small">Processos licitatórios ativos</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6">
+                    <div class="card border-0 border-start border-success border-4 shadow-sm h-100">
+                        <div class="card-body py-3">
+                            <span class="text-uppercase text-muted font-weight-bold btn-sm p-0">Saldo Total Empenhado</span>
+                            <h2 class="fw-bold text-success my-1">R$ {{ total_empenhado|floatformat:2 }}</h2>
+                            <div class="text-muted small">Capital total investido</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-    <!-- TABELA PRINCIPAL DE CONTRATOS -->
-    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-        <div style="overflow-x: auto;">
-            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
-                <thead>
-                    <tr style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;">
-                        <th style="padding: 12px 16px;">Contrato / Processo</th>
-                        <th style="padding: 12px 16px;">Tipo</th>
-                        <th style="padding: 12px 16px;">Favorecido / Instrutor</th>
-                        <th style="padding: 12px 16px;">Valor Global</th>
-                        <th style="padding: 12px 16px;">Vigência</th>
-                        <th style="padding: 12px 16px;">Status</th>
-                        <th style="padding: 12px 16px; text-align: center;">Ações</th>
-                    </tr>
-                </thead>
-                <tbody style="color: #334155;">
-                    {% for contrato in contratos %}
-                    <tr style="border-bottom: 1px solid #f1f5f9; transition: background-color 0.2s;">
-                        <td style="padding: 12px 16px;">
-                            <span style="font-weight: 600; color: #0f172a;">{{ contrato.numero_contrato }}</span><br>
-                            <small style="color: #64748b; font-size: 0.8rem;">Proc: {{ contrato.numero_processo }}</small>
-                        </td>
-                        <td style="padding: 12px 16px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; border: 1px solid #e2e8f0;">{{ contrato.get_tipo_display }}</span>
-                        </td>
-                        <td style="padding: 12px 16px; font-weight: 500;">
-                            {{ contrato.instrutor.get_full_name|default:contrato.instrutor.username }}
-                        </td>
-                        <td style="padding: 12px 16px; font-weight: 600; color: #0f172a;">
-                            R$ {{ contrato.valor_total_empenhado }}
-                        </td>
-                        <td style="padding: 12px 16px; color: #64748b; font-size: 0.85rem;">
-                            <div>Início: {{ contrato.data_vigencia_inicio|date:"d/m/Y" }}</div>
-                            <div>Fim: {{ contrato.data_vigencia_fim|date:"d/m/Y" }}</div>
-                        </td>
-                        <td style="padding: 12px 16px;">
-                            {% if contrato.status == 'VIGENTE' %}
-                                <span style="background-color: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">Vigente</span>
-                            {% else %}
-                                <span style="background-color: #f1f5f9; color: #475569; padding: 4px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600;">{{ contrato.get_status_display }}</span>
-                            {% endif %}
-                        </td>
-                        <td style="padding: 12px 16px; text-align: center;">
-                            <button style="background: none; border: 1px solid #cbd5e1; padding: 4px 8px; border-radius: 4px; cursor: pointer; color: #475569; font-size: 0.85rem;">
-                                Gerenciar
-                            </button>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="7" style="padding: 48px 16px; text-align: center; color: #64748b;">
-                            <div style="font-size: 2rem; margin-bottom: 8px;">📂</div>
-                            Nenhum registro de contrato ou empenho financeiro foi encontrado para exibição.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <!-- Tabela Histórica -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="card-title fw-bold text-dark mb-0">📋 Relação de Contratos Cadastrados</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 text-start align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="px-4 py-3">Identificador/Nº</th>
+                                    <th class="py-3">Valor Total</th>
+                                    <th class="py-3 text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for contrato in contratos %}
+                                <tr>
+                                    <td class="px-4 py-3"><strong>Contrato #{{ contrato.id }}</strong></td>
+                                    <td class="py-3 text-success fw-bold">R$ {{ contrato.valor_total_empenhado }}</td>
+                                    <td class="py-3 text-center">
+                                        {% if contrato.status == 'VIGENTE' %}
+                                            <span class="badge bg-success-subtle text-success px-3 py-1">Vigente</span>
+                                        {% else %}
+                                            <span class="badge bg-danger-subtle text-danger px-3 py-1">{{ contrato.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="p-4 text-center text-muted italic">
+                                        Nenhum contrato financeiro lançado no sistema.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
-
 </div>
 {% endblock %}

@@ -1,97 +1,93 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container-fluid px-4 py-4">
+<div class="container-fluid px-4 py-4" style="font-family: sans-serif;">
     <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
         <div>
-            <h3 class="fw-bold text-dark mb-1">Módulo de Qualidade</h3>
-            <p class="text-muted small mb-0">Métricas institucionais e relatórios gerenciais consolidados em tempo real.</p>
+            <h3 class="fw-bold text-dark mb-1">Módulo de Qualidade e Gestão Financeira</h3>
+            <p class="text-muted small mb-0">Métricas institucionais e inserção de contratos consolidados em tempo real.</p>
         </div>
         <div class="text-end">
             <span class="badge bg-primary px-3 py-2 fs-6 shadow-sm">Ano Letivo 2026</span>
         </div>
     </div>
 
-    <!-- Cards Principais de Desempenho (Métricas Críticas) -->
-    <div class="row g-3 mb-4">
-        <div class="col-12 col-sm-6 col-lg-3">
-            <div class="card border-0 border-start border-primary border-4 shadow-sm h-100">
-                <div class="card-body py-3">
-                    <span class="text-uppercase text-muted font-weight-bold btn-sm p-0">Em Instrução</span>
-                    <h2 class="fw-bold text-primary my-1">{{ alunos_cursando }}</h2>
-                    <div class="text-muted small">Alunos cursando regularmente</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-sm-6 col-lg-3">
-            <div class="card border-0 border-start border-success border-4 shadow-sm h-100">
-                <div class="card-body py-3">
-                    <span class="text-uppercase text-muted font-weight-bold btn-sm p-0">Formados / Aprovados</span>
-                    <h2 class="fw-bold text-success my-1">{{ alunos_aprovados }}</h2>
-                    <div class="text-muted small">Alunos com aprovação retida</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-sm-6 col-lg-3">
-            <div class="card border-0 border-start border-danger border-4 shadow-sm h-100">
-                <div class="card-body py-3">
-                    <span class="text-uppercase text-muted font-weight-bold btn-sm p-0">Taxa de Evasão</span>
-                    <h2 class="fw-bold text-danger my-1">{{ taxa_evasao }}%</h2>
-                    <div class="text-muted small">Índice global de abandono</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-sm-6 col-lg-3">
-            <div class="card border-0 border-start border-warning border-4 shadow-sm h-100">
-                <div class="card-body py-3">
-                    <span class="text-uppercase text-muted font-weight-bold btn-sm p-0">Contratos Públicos</span>
-                    <h2 class="fw-bold text-warning my-1">R$ {{ investimento_total|floatformat:2 }}</h2>
-                    <div class="text-muted small">{{ total_contratos }} processos licitatórios ativos</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Seções Detalhadas: Horários e Desempenho Pedagógico -->
+    <!-- Layout dividido em duas colunas -->
     <div class="row g-4">
-        <!-- Card Esquerdo: Distribuição de Aulas -->
-        <div class="col-12 col-xl-6">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-white border-bottom py-3">
-                    <h5 class="card-title fw-bold text-dark mb-0">Eficiência de Carga Horária</h5>
-                </div>
-                <div class="card-body">
-                    <div class="bg-light rounded p-3 text-center mb-4">
-                        <span class="text-muted small d-block">Volume Letivo Registrado</span>
-                        <h1 class="display-5 fw-bold text-dark mb-0">{{ horas_totais_instrucao }}h</h1>
+        
+        <!-- COLUNA DA ESQUERDA: Formulário de Inserção Rápida -->
+        <div class="col-12 col-lg-4">
+            <div class="card shadow-sm border-0 p-4">
+                <h5 class="fw-bold text-dark mb-2" style="border-bottom: 2px solid #0d6efd; padding-bottom: 6px;">Lançar Novo Contrato</h5>
+                
+                <form method="POST" class="mt-3">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-muted text-uppercase">Valor Total Empenhado (R$):</label>
+                        <input type="number" step="0.01" name="valor_total_empenhado" class="form-control shadow-sm" placeholder="Ex: 50000.00" required>
                     </div>
 
                     <div class="mb-3">
-                        <div class="d-flex justify-content-between small text-muted mb-1">
-                            <span>Aulas Teóricas</span>
-                            <span class="fw-bold text-dark">{{ horas_teoricas }}h ({{ pct_teorica }}%)</span>
-                        </div>
-                        <div class="progress rounded-pill" style="height: 10px;">
-                            <div class="progress-bar bg-info" role="progressbar" style="width: {{ pct_teorica }}%"></div>
-                        </div>
+                        <label class="form-label fw-semibold small text-muted text-uppercase">Status Inicial:</label>
+                        <select name="status" class="form-select shadow-sm" required>
+                            <option value="VIGENTE">Vigente</option>
+                            <option value="ENCERRADO">Encerrado</option>
+                        </select>
                     </div>
 
-                    <div class="mb-2">
-                        <div class="d-flex justify-content-between small text-muted mb-1">
-                            <span>Aulas Práticas / Laboratórios</span>
-                            <span class="fw-bold text-dark">{{ horas_praticas }}h ({{ pct_pratica }}%)</span>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold py-2 shadow-sm mt-2">
+                        Gravar Contrato no Sistema
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- COLUNA DA DIREITA: Seus indicadores e gráficos existentes -->
+        <div class="col-12 col-lg-8">
+            
+            <!-- Linha de Cards Superiores -->
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-sm-6">
+                    <div class="card border-0 border-start border-primary border-4 shadow-sm h-100">
+                        <div class="card-body py-3">
+                            <span class="text-uppercase text-muted font-weight-bold btn-sm p-0">Em Instrução</span>
+                            <h2 class="fw-bold text-primary my-1">{{ cursando }}</h2>
+                            <div class="text-muted small">Alunos cursando regularmente</div>
                         </div>
-                        <div class="progress rounded-pill" style="height: 10px;">
-                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ pct_pratica }}%"></div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6">
+                    <div class="card border-0 border-start border-success border-4 shadow-sm h-100">
+                        <div class="card-body py-3">
+                            <span class="text-uppercase text-muted font-weight-bold btn-sm p-0">Formados / Aprovados</span>
+                            <h2 class="fw-bold text-success my-1">{{ aprovados }}</h2>
+                            <div class="text-muted small">Alunos com aprovação retida</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6">
+                    <div class="card border-0 border-start border-danger border-4 shadow-sm h-100">
+                        <div class="card-body py-3">
+                            <span class="text-uppercase text-muted font-weight-bold btn-sm p-0">Taxa de Evasão</span>
+                            <h2 class="fw-bold text-danger my-1">{{ taxa_evasao }}%</h2>
+                            <div class="text-muted small">Índice global de abandono</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6">
+                    <div class="card border-0 border-start border-warning border-4 shadow-sm h-100">
+                        <div class="card-body py-3">
+                            <span class="text-uppercase text-muted font-weight-bold btn-sm p-0">Contratos Públicos</span>
+                            <h2 class="fw-bold text-warning my-1">R$ {{ total_contratos }}</h2>
+                            <div class="text-muted small">{{ total_vigentes }} processos licitatórios ativos</div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Card Direito: Status de Matrículas e Retenção Escolar -->
-        <div class="col-12 col-xl-6">
-            <div class="card shadow-sm border-0 h-100">
+            <!-- Eficiência de Carga Horária e Outros Pedagógicos -->
+            <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-white border-bottom py-3">
                     <h5 class="card-title fw-bold text-dark mb-0">Auditoria Operacional de Alunos</h5>
                 </div>
@@ -102,18 +98,12 @@
                                 <h6 class="mb-0 fw-semibold text-dark">Alunos com Reprovação Direta</h6>
                                 <small class="text-muted">Retidos por nota ou frequência insuficiente.</small>
                             </div>
-                            <span class="badge bg-danger rounded-pill px-3 py-2 fw-bold">{{ alunos_reprovados }}</span>
-                        </div>
-                        <div class="list-group-item d-flex justify-content-between align-items-center py-3 px-4">
-                            <div>
-                                <h6 class="mb-0 fw-semibold text-dark">Total de Vínculos Processados</h6>
-                                <small class="text-muted">Soma de todas as interações e matrículas no ano corrente.</small>
-                            </div>
-                            <span class="badge bg-dark rounded-pill px-3 py-2 fw-bold">{{ total_matriculas }}</span>
+                            <span class="badge bg-danger rounded-pill px-3 py-2 fw-bold">{{ reprovados }}</span>
                         </div>
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
 </div>

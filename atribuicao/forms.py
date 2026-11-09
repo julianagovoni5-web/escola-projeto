@@ -410,3 +410,36 @@ class HorarioAulaForm(forms.ModelForm):
             )
 
         return cleaned_data
+
+from django import forms
+from .models import RegistroInstrucao
+
+class RegistroInstrucaoForm(forms.ModelForm):
+    class Meta:
+        model = RegistroInstrucao
+        # Adicione aqui os campos exatos do seu modelo que estão no formulário
+        fields = ['data_instrucao', 'carga_horaria', 'tipo_instrucao', 'conteudo_programatico']
+
+from django import forms
+from .models import ContratoFinanceiro
+
+class ContratoFinanceiroForm(forms.ModelForm):
+    class Meta:
+        model = ContratoFinanceiro
+        # Liberamos estes dois campos para preenchimento no formulário:
+        fields = ['valor_total_empenhado', 'status']
+
+from django import forms
+from .models import ContratoFinanceiro
+
+class ContratoFinanceiroForm(forms.ModelForm):
+    class Meta:
+        model = ContratoFinanceiro
+        fields = ['valor_total_empenhado', 'status']
+
+from .models import MedicaoContrato
+
+class MedicaoContratoForm(forms.ModelForm):
+    class Meta:
+        model = MedicaoContrato
+        fields = ['contrato', 'numero_parcela', 'valor_medido', 'status']

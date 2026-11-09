@@ -146,6 +146,12 @@ class RegistroInstrucao(models.Model):
     class TipoInstrucao(models.TextChoices):
         TEORICA = 'TEORICA', 'Teórica'
         PRATICA = 'PRATICA', 'Prática'
+    tipo_instrucao = models.CharField(
+        max_length=10,
+        choices=TipoInstrucao.choices,
+        default=TipoInstrucao.TEORICA,
+        verbose_name="Tipo de Instrução"
+    )
     
     atribuicao = models.ForeignKey(
         Atribuicao, 
@@ -257,3 +263,34 @@ class ContratoFinanceiro(models.Model):
     def __str__(self):
         credor = self.instrutor.get_full_name() if self.instrutor else self.credor_razao_social
         return f"Contrato {self.numero_contrato} - {credor}"
+
+class MedicaoContrato(models.Model):
+    class StatusMedicao(models.TextChoices):
+        PENDENTE = 'PENDENTE', 'Pendente de Aprovação'
+        APROVADO = 'APROVADO', 'Aprovado / Pago'
+        REJEITADO = 'REJEITADO', 'Rejeitado / Com Falha'
+
+    # Vincula a medição a um contrato existente
+    contrato = models.ForeignKey(
+        ContratoFinanceiro, 
+        on_delete=models.CASCADE, 
+        related_name='medicoes',
+        verbose_name="Contrato Vinculado"
+    )
+    numero_parcela = models.IntegerField(verbose_name="Número da Parcela / Medição")
+    valor_medido = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Valor da Medição (R$)")
+    data_envio = models.DateField(auto_now_add=True, verbose_name="Data de Envio")
+    status = models.CharField(
+        max_length=15,
+        choices=StatusMedicao.choices,
+        default=StatusMedicao.PENDENTE,
+        verbose_name="Status da Medição"
+    )
+
+    class Meta:
+        verbose_name = "Medição de Contrato"
+        verbose_name_plural = "Medições de Contratos"
+        ordering = ['-data_envio']
+
+    def __str__(self):
+        return f"Contrato #{self.contrato.id} - Parcela {self.numero_parcela} ({self.get_status_display()})"

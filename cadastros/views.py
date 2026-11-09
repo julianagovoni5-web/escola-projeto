@@ -262,7 +262,7 @@ class DetalhePessoaView(DetailView):
 
         matriculas = list(
             atribuicao.matriculas_turma.select_related(
-                'turma__oferta_modulo__modulo', 'ata_inicio', 'ata_encerramento'
+                'turma', 'ata_inicio', 'ata_encerramento'
             ).order_by('id')
         )
 
@@ -1225,13 +1225,27 @@ class AdicionarTurmaView(ModalCrudMixin, CreateView):
         # (tela de debug) em vez de mensagem amigável. Bug real de teste
         # manual, corrigido em 08/09/2026 (docs/39).
         kwargs = super().get_form_kwargs()
-        if kwargs.get('instance') is None:
-            kwargs['instance'] = Turma(oferta_modulo=self.oferta_modulo)
+        kwargs['instance'] = Turma()
+        
+        # INJETAMOS A OFERTA VIA DICIONÁRIO DE DADOS INICIAIS (MÉTODO SEGURO E PADRÃO DJANGO):
+        if 'initial' not in kwargs:
+            kwargs['initial'] = {}
+        kwargs['initial']['oferta_modulo'] = self.oferta_modulo
+        kwargs['initial']['oferta'] = self.oferta_modulo
+        kwargs['initial']['modulo'] = self.oferta_modulo
         return kwargs
 
     def form_valid(self, form):
-        form.instance.oferta_modulo = self.oferta_modulo
+        # 1. Certifique-se de que estas linhas possuem exatamente 8 espaços de recuo à esquerda:
+        if hasattr(form.instance, 'modulo'):
+            form.instance.modulo = self.oferta_modulo
+        elif hasattr(form.instance, 'oferta'):
+            form.instance.oferta = self.oferta_modulo
+        else:
+            form.instance.oferta_modulo = self.oferta_modulo
+            
         return super().form_valid(form)
+
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1380,9 +1394,7 @@ from django.contrib.auth.models import User
 
 # Imports dos modelos do seu ecossistema
 from cadastros.models import Turma
-from atribuicao.models import (
-    MatriculaTurma, StatusMatriculaTurma, Atribuicao, RegistroInstrucao, ContratoFinanceiro
-)
+
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     """
@@ -1399,8 +1411,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             return redirect(reverse('dashboard'))  # Redireciona limpando a URL
         return super().get(request, *args, **kwargs)
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
+        def get_context_data(self, **kwargs):
+            context = super().get_context_data(**kwargs)
         
         ano_atual = timezone.now().year
         data_hoje = timezone.now().date()
@@ -1432,6 +1444,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             alertas = []
 
             # --- REGRA A: Contratos Financeiros Próximos do Vencimento (< 30 dias) ---
+            # 💡 IMPORTAÇÃO LOCAL DINÂMICA: Isso quebra o loop de importação cíclica definitivamente!
+            from atribuicao.models import ContratoFinanceiro
+
             data_limite_contrato = data_hoje + timezone.timedelta(days=30)
             contratos_criticos = ContratoFinanceiro.objects.filter(
                 status='VIGENTE',
@@ -1516,104 +1531,142 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 # ==============================================================================
 # MÓDULO: GESTÃO DE CONTRATOS PÚBLICOS / PRESTAÇÃO DE SERVIÇOS
 # ==============================================================================
-from django.views.generic import ListView, CreateView
+from django.views import View
+from django.views.generic import CreateView
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
-from django.http import JsonResponse
-from django.db.models import Q
-from atribuicao.models import ContratoFinanceiro
-from .forms import ContratoFinanceiroModelForm
+from django.http import JsonResponse, HttpResponseRedirect
+from django.db.models import Q, Sum
 
-class ListaContratosView(LoginRequiredMixin, ListView):
+
+
+class ListaContratosView(LoginRequiredMixin, View):
     """
-    SRP: Responsável por traduzir requisições HTTP para renderização
-    e filtragem da listagem de contratos públicos vigentes ou encerrados.
+    SRP: Responsável por gerenciar os indicadores gerenciais, a listagem
+    com filtro de busca e a gravação de contratos e suas medições.
+    A herança de 'View' permite responder a requisições GET e POST simultaneamente.
     """
-    model = ContratoFinanceiro
     template_name = 'cadastros/lista_contratos.html'
-    context_object_name = 'contratos'
+
+    def get_contrato_form(self, data=None):
+        from django.forms import modelform_factory
+        from atribuicao.models import ContratoFinanceiro
+        FormClass = modelform_factory(ContratoFinanceiro, fields=[
+            'numero_contrato', 'numero_processo', 'credor_razao_social', 
+            'tipo', 'valor_total_empenhado', 'data_assinatura', 
+            'data_vigencia_inicio', 'data_vigencia_fim', 'objeto_contrato', 'status'
+        ])
+        return FormClass(data)
+
+    def get_medicao_form(self, data=None):
+        from django.forms import modelform_factory
+        from atribuicao.models import MedicaoContrato
+        FormClass = modelform_factory(MedicaoContrato, fields=[
+            'contrato', 'numero_parcela', 'valor_medido', 'status'
+        ])
+        return FormClass(data)
 
     def get_queryset(self):
-        # Traz o relacionamento do instrutor para evitar múltiplas queries (N+1)
-        queryset = ContratoFinanceiro.objects.select_related('instrutor').all()
+        from atribuicao.models import ContratoFinanceiro
+        from django.db.models import Q
+        queryset = ContratoFinanceiro.objects.all().order_by('-id')
+        termo_busca = self.request.GET.get('busca', '').strip()
+        if termo_busca:
+            queryset = queryset.filter(
+                Q(numero_contrato__icontains=termo_busca) |
+                Q(credor_razao_social__icontains=termo_busca)
+            )
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        from atribuicao.models import ContratoFinanceiro, MedicaoContrato
+        from django.db.models import Sum
+        context = {}
+        context['filtro_busca'] = self.request.GET.get('busca', '').strip()
         
-        # Filtro de busca na barra de pesquisa
-        termo_busca = self.request.GET.get('busca', '').strip()
-        if termo_busca:
-            queryset = queryset.filter(
-                Q(numero_contrato__icontains=termo_busca) |
-                Q(credor_razao_social__icontains=termo_busca) |
-                Q(instrutor__username__icontains=termo_busca)
-            )
-        return queryset
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['filtro_busca'] = self.request.GET.get('busca', '')
+        # 1. CÁLCULO DOS TRÊS CARDS SUPERIORES PUXANDO DO BANCO DE DADOS
+        context['total_contratos'] = ContratoFinanceiro.objects.filter(status='VIGENTE').count()
+        
+        soma_real = ContratoFinanceiro.objects.filter(status='VIGENTE').aggregate(total=Sum('valor_total_empenhado'))['total'] or 0
+        context['total_empenhado'] = soma_real
+        
+        soma_pendente = MedicaoContrato.objects.filter(status='PENDENTE').aggregate(total=Sum('valor_medido'))['total'] or 0
+        context['total_pendente'] = soma_pendente
+        
+        # 2. ENVIAR OS DADOS E LISTAGENS PARA O HTML
+        context['contratos'] = self.get_queryset()
+        context['medicoes'] = MedicaoContrato.objects.select_related('contrato').all().order_by('-id')
+        
         return context
 
+    def get(self, request, *args, **kwargs):
+        """Renderiza a página normalmente no carregamento inicial ou na busca (GET)"""
+        context = self.get_context_data()
+        context['form'] = self.get_contrato_form()
+        return render(request, self.template_name, context)
 
-class AdicionarContratoView(LoginRequiredMixin, ModalCrudMixin, CreateView):
+    def post(self, request, *args, **kwargs):
+        """PROCESSA O CLIQUE NO BOTÃO AZUL E FORÇA A GRAVAÇÃO NO BANCO (POST)"""
+        from django.shortcuts import HttpResponseRedirect
+        action = request.POST.get('action')
+        
+        if action == 'gravar_contrato':
+            form = self.get_contrato_form(request.POST)
+            if form.is_valid():
+                form.save()  # Salva o novo contrato direto no banco de dados!
+                return HttpResponseRedirect(request.path_info)
+            else:
+                print("⚠️ O DJANGO REJEITOU O FORMULÁRIO. ERROS:", form.errors)
+                context = self.get_context_data()
+                context['form'] = form
+                context['form_errors'] = form.errors  # Envia os erros estruturados para o HTML
+                return render(request, self.template_name, context)
+                
+        elif action == 'gravar_medicao':
+            form = self.get_medicao_form(request.POST)
+            if form.is_valid():
+                form.save()  # Salva a nova medição/parcela pendente no banco!
+                return HttpResponseRedirect(request.path_info)
+            else:
+                print("⚠️ O DJANGO REJEITOU A MEDIÇÃO. ERROS:", form.errors)
+                context = self.get_context_data()
+                context['form'] = self.get_contrato_form()
+                context['form_errors'] = form.errors
+                return render(request, self.template_name, context)
+                
+        return HttpResponseRedirect(request.path_info)
+
+
+class AdicionarContratoView(LoginRequiredMixin, CreateView):
     """
-    SRP: Responsável por gerenciar a requisição AJAX/HTTP para renderizar
-    o fragmento do formulário dentro do modal e persistir novos contratos.
+    SRP: Gerencia a requisição para persistir novos contratos.
+    Importações inseridas estritamente nos métodos para evitar NameError e loops.
     """
-    model = ContratoFinanceiro
-    form_class = ContratoFinanceiroModelForm
     template_name = 'cadastros/_form_contrato_fragment.html'
-    success_url = reverse_lazy('contratos')
+
+    @property
+    def model(self):
+        # 🎯 CERTEIRO: Importação sob demanda resolve o NameError da linha 1646
+        from atribuicao.models import ContratoFinanceiro
+        return ContratoFinanceiro
+
+    def get_success_url(self):
+        from django.urls import reverse_lazy
+        return reverse_lazy('contratos')
+
+    def get_form_class(self):
+        from django.forms import modelform_factory
+        return modelform_factory(self.model, fields=[
+            'numero_contrato', 'numero_processo', 'credor_razao_social', 
+            'tipo', 'valor_total_empenhado', 'data_assinatura', 
+            'data_vigencia_inicio', 'data_vigencia_fim', 'objeto_contrato', 'status'
+        ])
 
     def form_valid(self, form):
+        from django.http import JsonResponse
         response = super().form_valid(form)
         if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({'sucesso': True, 'redirect': str(self.success_url)})
+            return JsonResponse({'sucesso': True, 'redirect': str(self.get_success_url())})
         return response
-# LOCALIZAÇÃO: Fim do arquivo cadastros/views.py
 
-from django.views.generic import ListView, CreateView
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.urls import reverse_lazy
-from django.http import JsonResponse
-from django.db.models import Q
-from atribuicao.models import ContratoFinanceiro
-from .forms import ContratoFinanceiroModelForm
-
-class ListaContratosView(LoginRequiredMixin, ListView):
-    """
-    SRP: Responsável por renderizar a listagem de contratos.
-    """
-    model = ContratoFinanceiro
-    template_name = 'cadastros/lista_contratos.html'
-    context_object_name = 'contratos'
-
-    def get_queryset(self):
-        queryset = ContratoFinanceiro.objects.select_related('instrutor').all()
-        termo_busca = self.request.GET.get('busca', '').strip()
-        if termo_busca:
-            queryset = queryset.filter(
-                Q(numero_contrato__icontains=termo_busca) |
-                Q(credor_razao_social__icontains=termo_busca) |
-                Q(instrutor__username__icontains=termo_busca)
-            )
-        return queryset
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['filtro_busca'] = self.request.GET.get('busca', '')
-        return context
-
-
-class AdicionarContratoView(LoginRequiredMixin, ModalCrudMixin, CreateView):
-    """
-    SRP: Responsável por abrir o formulário no Modal.
-    """
-    model = ContratoFinanceiro
-    form_class = ContratoFinanceiroModelForm
-    template_name = 'cadastros/_form_contrato_fragment.html'
-    success_url = reverse_lazy('contratos')
-
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return JsonResponse({'sucesso': True, 'redirect': str(self.success_url)})
-        return response

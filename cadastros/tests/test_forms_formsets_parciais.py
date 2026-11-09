@@ -84,7 +84,7 @@ class TestHistoricoVinculoFormalFormValidacaoParcial:
         assert 'data_inicio' in form.errors
 
     def test_linha_totalmente_preenchida_e_valida(self):
-        vinculo = VinculoFormal.objects.create(nome="FAPETI Teste 2")
+        vinculo = VinculoFormal.objects.create(tipo_vinculo="FAPETI Teste 2")
         form = HistoricoVinculoFormalForm(data={
             'vinculo_formal': str(vinculo.id), 'data_inicio': '2020-01-01', 'data_fim': '',
         })

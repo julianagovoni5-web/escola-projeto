@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid p-4" style="font-family: sans-serif; background-color: #f8fafc; min-height: 100vh;">
+    
+    <!-- Cabeçalho -->
+    <div style="margin-bottom: 30px;">
+        <h2 style="color: #333; margin-bottom: 5px;">💰 Gestão de Contratos Financeiros</h2>
+        <span style="color: #666; font-size: 14px;">Controle analítico de orçamentos empenhados e inserção de novos contratos.</span>
+    </div>
+
+    <!-- Layout dividido em duas colunas (Formulário à esquerda, Dados à direita) -->
+    <div style="display: flex; gap: 32px; align-items: flex-start;">
+        
+        <!-- Formulário de Inserção (Lado Esquerdo) -->
+        <div style="background: white; padding: 24px; border-radius: 8px; border: 1px solid #e2e8f0; width: 35%; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+            <h4 style="margin-top: 0; color: #2c3e50; font-weight: 700; border-bottom: 2px solid #2c3e50; padding-bottom: 6px;">Inserir Novo Contrato</h4>
+            
+            <form method="POST" style="margin-top: 16px;">
+                {% csrf_token %}
+                
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem;">Valor Total Empenhado (R$):</label>
+                    <input type="number" step="0.01" name="valor_total_empenhado" style="padding: 8px; width: 100%; border-radius: 4px; border: 1px solid #ccc;" placeholder="Ex: 15000.00" required>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-weight: 600; margin-bottom: 4px; font-size: 0.9rem;">Status Inicial do Contrato:</label>
+                    <select name="status" style="padding: 8px; width: 100%; border-radius: 4px; border: 1px solid #ccc;" required>
+                        <option value="VIGENTE">Vigente</option>
+                        <option value="ENCERRADO">Encerrado</option>
+                    </select>
+                </div>
+
+                <button type="submit" style="background-color: #2c3e50; color: white; border: none; padding: 12px; font-weight: 600; width: 100%; border-radius: 4px; cursor: pointer; margin-top: 12px; font-size: 0.95rem;">
+                    Gravar Contrato no Sistema
+                </button>
+            </form>
+        </div>
+
+        <!-- Painel de Indicadores e Tabela (Lado Direito) -->
+        <div style="width: 65%; display: flex; flex-direction: column; gap: 24px;">
+            
+            <!-- Cards de Indicadores Rápidos -->
+            <div style="display: flex; gap: 20px;">
+                <div style="flex: 1; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); border-left: 5px solid #27ae60;">
+                    <small style="color: #666; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 6px;">Total Empenhado (Vigentes)</small>
+                    <strong style="font-size: 28px; color: #27ae60; display: block;">R$ {{ total_empenhado }}</strong>
+                </div>
+
+                <div style="flex: 1; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); border-left: 5px solid #2980b9;">
+                    <small style="color: #666; text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 6px;">Contratos Ativos</small>
+                    <strong style="font-size: 28px; color: #212529; display: block;">{{ total_contratos }}</strong>
+                </div>
+            </div>
+
+            <!-- Tabela Histórica -->
+            <div style="background: #fff; padding: 24px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;">
+                <h4 style="margin-top: 0; margin-bottom: 16px; color: #334155; font-weight: 700;">📋 Relação de Contratos Cadastrados</h4>
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="background-color: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
+                            <th style="padding: 12px; font-size: 0.9rem;">Identificador/Nº</th>
+                            <th style="padding: 12px; font-size: 0.9rem;">Valor Total</th>
+                            <th style="padding: 12px; font-size: 0.9rem; text-align: center;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for contrato in contratos %}
+                        <tr style="border-bottom: 1px solid #e2e8f0;">
+                            <td style="padding: 12px; font-size: 0.9rem;"><strong>Contrato #{{ contrato.id }}</strong></td>
+                            <td style="padding: 12px; font-size: 0.9rem; color: #27ae60; font-weight: 600;">R$ {{ contrato.valor_total_empenhado }}</td>
+                            <td style="padding: 12px; font-size: 0.9rem; text-align: center;">
+                                {% if contrato.status == 'VIGENTE' %}
+                                    <span style="background: #e8f5e9; color: #2e7d32; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; display: inline-block;">Vigente</span>
+                                {% else %}
+                                    <span style="background: #ffebee; color: #c62828; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; display: inline-block;">{{ contrato.status }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" style="padding: 24px; text-align: center; color: #94a3b8; font-style: italic;">
+                                Nenhum contrato financeiro lançado no sistema.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

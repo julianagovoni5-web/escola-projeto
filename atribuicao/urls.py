@@ -3,9 +3,10 @@ from .views import (
     GerenciarTurmaView, AdicionarMatriculaTurmaView, EditarMatriculaTurmaView,
     ExcluirMatriculaTurmaView, FinalizarPlanejamentoView, EditarStatusMatriculaView,
     RevisarAprovacaoView, EncerrarTurmaView,
-    registro_instrucao_view, horarios_view, relatorios_view, dashboard_gestao_view, contratos_gestao_view,
-    TreinamentoListView, AuditoriaInternaListView, IndicadoresQualidadeView, AtribuicaoDisciplinaView
+    registro_instrucao_view, horarios_view, relatorios_view, dashboard_gestao_view,
+    TreinamentoListView, AuditoriaInternaListView, IndicadoresQualidadeView, AtribuicaoDisciplinaView, contratos_gestao_view
 )
+
 
 urlpatterns = [
     # GERENCIAMENTO DE TURMAS
@@ -25,7 +26,9 @@ urlpatterns = [
     path('horarios/', horarios_view, name='horarios'),
     path('relatorios/', relatorios_view, name='relatorios'),
     path('dashboard/', dashboard_gestao_view, name='dashboard'),
-    path('contratos/', contratos_gestao_view, name='contratos'),
+    path('indicadores/', IndicadoresQualidadeView.as_view(), name='indicadores_qualidade'),
+
+
 
     # ATRIBUIÇÃO DE DISCIPLINAS (Duplo mapeamento para salvar o menu dinâmico!)
     path('coordenacao/atribuicao/', AtribuicaoDisciplinaView.as_view(), name='atribuicao-disciplina'),
@@ -35,4 +38,5 @@ urlpatterns = [
     path('qualidade/treinamento/', TreinamentoListView.as_view(), name='qualidade-treinamento'),
     path('qualidade/auditoria/', AuditoriaInternaListView.as_view(), name='qualidade-auditoria'),
     path('qualidade/indicadores-qualidade/', IndicadoresQualidadeView.as_view(), name='qualidade-indicadores'),
+    path('cadastros/contratos/', contratos_gestao_view, name='contratos_gestao'),
 ]
